@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Smart Food & Health Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tracker_style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🍏</span>
+                <h2>NutriSmart</h2>
+            </div>
+            <ul class="nav-links">
+                <li onclick="window.location.href='/'" style="color: var(--warning); border: 1px solid var(--warning);">← Digital Twin</li>
+                <li class="active" data-tab="dashboard">Dashboard</li>
+                <li data-tab="meals">Meal Entry</li>
+                <li data-tab="analysis">Analysis</li>
+                <li data-tab="food-database">Food DB</li>
+            </ul>
+            <div class="time-widget">
+                <p id="current-time">00:00:00</p>
+                <p id="current-meal-window" class="status-badge">Calculating Window...</p>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header>
+                <div class="header-info">
+                    <h1>Welcome, <span class="highlight">{% if user %}{{ user.name }}{% else %}Guest{% endif %}</span> 👋</h1>
+                    <p>Here is your daily nutrition summary.{% if not user %} <a href="/" style="color: var(--primary);">Login</a> to save data.{% endif %}</p>
+                </div>
+                <!-- Notification Bell -->
+                <div class="notifications">
+                    <button id="noti-btn" class="noti-btn">🔔<span id="noti-badge" class="badge hidden">0</span></button>
+                    <div id="noti-dropdown" class="noti-dropdown hidden">
+                        <h4>Reminders</h4>
+                        <ul id="noti-list">
+                            <li>No new notifications.</li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <section id="dashboard" class="view active-view">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <h3>Carbs</h3>
+                            <span class="target-text">Target: 250-300g</span>
+                        </div>
+                        <div class="stat-value"><span id="total-carbs">0</span>g</div>
+                        <div class="progress-bar"><div id="carbs-progress" class="progress carbs" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <h3>Protein</h3>
+                            <span class="target-text">Target: 50-70g</span>
+                        </div>
+                        <div class="stat-value"><span id="total-protein">0</span>g</div>
+                        <div class="progress-bar"><div id="protein-progress" class="progress protein" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <h3>Fiber</h3>
+                            <span class="target-text">Target: 25-35g</span>
+                        </div>
+                        <div class="stat-value"><span id="total-fiber">0</span>g</div>
+                        <div class="progress-bar"><div id="fiber-progress" class="progress fiber" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <h3>Est. Calories</h3>
+                        </div>
+                        <div class="stat-value"><span id="total-calories">0</span> kcal</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card meal-status-card">
+                        <h3>Today's Meals</h3>
+                        <div class="meal-timeline" id="meal-timeline">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <div class="card insights-card">
+                        <h3>Health Insights & Suggestions</h3>
+                        <div class="insights-container" id="insights-container">
+                            <p class="neutral-text">Add meals to see insights.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Meal Entry View -->
+            <section id="meals" class="view">
+                <div class="card">
+                    <h2>Record a Meal</h2>
+                    
+                    <div style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(0, 240, 255, 0.05), rgba(189, 0, 255, 0.05)); padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px dashed var(--primary); position: relative; overflow: hidden;" id="ai-snap-container">
+                        <h3 style="margin-bottom: 0.5rem; color: var(--primary);">📸 Gemini Vision Detector</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.95rem;">Upload a picture of your food and let Gemini AI instantly scan its calories and macros!</p>
+                        
+                        <input type="file" id="ai-snap-input" accept="image/*" style="display: none;">
+                        <label for="ai-snap-input" class="btn btn-primary" id="ai-snap-label" style="font-size: 1.05rem; border-radius: 30px; padding: 0.8rem 1.5rem; cursor: pointer; display: inline-block;">Upload / Snap Photo</label>
+                        
+                        <div id="ai-snap-preview-container" style="display: none; margin-top: 1rem;">
+                            <img id="ai-snap-preview" src="" style="max-width: 100%; max-height: 200px; border-radius: 8px; border: 2px solid var(--primary);">
+                            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
+                                <button type="button" class="btn btn-primary" id="ai-snap-confirm" style="padding: 0.5rem 1.5rem; font-size: 1rem;">Analyze using Gemini</button>
+                                <button type="button" class="btn btn-outline" id="ai-snap-cancel" style="padding: 0.5rem 1.5rem; font-size: 1rem;">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div id="ai-snap-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); flex-direction: column; justify-content: center; align-items: center; z-index: 10; backdrop-filter: blur(5px);">
+                            <div class="loader" style="border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 1rem;"></div>
+                            <h3 style="color: var(--primary);">Gemini is Analyzing...</h3>
+                        </div>
+                    </div>
+
+                    <form id="meal-form" class="meal-form">
+                        <div class="form-group">
+                            <label>Select Meal Type</label>
+                            <select id="meal-type" required>
+                                <option value="" disabled selected>Select...</option>
+                                <option value="Breakfast">Breakfast (6 AM - 11 AM)</option>
+                                <option value="Lunch">Lunch (12 PM - 3 PM)</option>
+                                <option value="Snacks">Snacks (4 PM - 6 PM)</option>
+                                <option value="Dinner">Dinner (7 PM - 11 PM)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group row-group">
+                            <div class="flex-grow">
+                                <label>Search Food</label>
+                                <input type="text" id="food-search" placeholder="E.g., Roti, Eggs, Dal...">
+                                <div id="food-dropdown" class="food-dropdown hidden"></div>
+                            </div>
+                            <div class="flex-small">
+                                <label>Quantity</label>
+                                <input type="number" id="food-qty" min="1" value="1" placeholder="g / units">
+                            </div>
+                            <div class="flex-small">
+                                <label>Unit</label>
+                                <select id="food-unit">
+                                    <option value="100g">Per 100g</option>
+                                    <option value="item">Per Item</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="button" id="add-food-btn" class="btn btn-secondary">Add to Current Entry</button>
+                    </form>
+
+                    <div class="current-entry-list">
+                        <h3>Current Items</h3>
+                        <ul id="current-items-list" class="items-list">
+                            <li class="empty-list">No items added yet.</li>
+                        </ul>
+                        <div class="entry-summary">
+                            <span>Carbs: <b id="entry-carbs">0</b>g</span>
+                            <span>Protein: <b id="entry-protein">0</b>g</span>
+                            <span>Fiber: <b id="entry-fiber">0</b>g</span>
+                            <span>Calories: <b id="entry-calories">0</b> kcal</span>
+                        </div>
+                        <button type="button" id="submit-meal-btn" class="btn btn-primary" disabled>Save Meal Entry</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis View -->
+            <section id="analysis" class="view">
+                <div class="card">
+                    <div class="analysis-header">
+                        <h2 style="margin-bottom: 0.3rem;">📊 Health Analysis</h2>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">View your nutrition breakdown over different time periods</p>
+                    </div>
+
+                    <!-- Time Range Selector -->
+                    <div class="time-range-tabs" id="time-range-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                        <button class="range-tab active" data-range="daily" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: 1px solid var(--border); background: var(--accent); color: white; cursor: pointer; font-family: var(--font-main); font-weight: 600; font-size: 0.9rem; transition: all 0.3s;">📅 Today</button>
+                        <button class="range-tab" data-range="7days" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); cursor: pointer; font-family: var(--font-main); font-weight: 600; font-size: 0.9rem; transition: all 0.3s;">📆 Last 7 Days</button>
+                        <button class="range-tab" data-range="10days" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); cursor: pointer; font-family: var(--font-main); font-weight: 600; font-size: 0.9rem; transition: all 0.3s;">🗓 Last 10 Days</button>
+                        <button class="range-tab" data-range="30days" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); cursor: pointer; font-family: var(--font-main); font-weight: 600; font-size: 0.9rem; transition: all 0.3s;">📊 Last 1 Month</button>
+                    </div>
+
+                    <!-- Selected Range Label -->
+                    <div id="range-label" style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--accent-hover); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>📅</span> <span id="range-label-text">Today's Report</span>
+                    </div>
+
+                    <div class="analysis-grid">
+                        <div class="chart-container" style="position: relative;">
+                            <canvas id="macrosChart"></canvas>
+                            <div id="chart-center-label" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%); text-align: center; pointer-events: none;">
+                                <div id="chart-total-cal" style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">kcal</div>
+                            </div>
+                        </div>
+                        <div>
+                            <!-- Macro Summary Pills -->
+                            <div id="macro-pills" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1.5rem;">
+                                <div style="background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.25); border-radius: 12px; padding: 1rem; text-align: center;">
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.3rem;">🍞 Carbs</div>
+                                    <div id="pill-carbs" style="font-size: 1.4rem; font-weight: 800; color: #58a6ff;">0g</div>
+                                </div>
+                                <div style="background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.25); border-radius: 12px; padding: 1rem; text-align: center;">
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.3rem;">🥩 Protein</div>
+                                    <div id="pill-protein" style="font-size: 1.4rem; font-weight: 800; color: #3fb950;">0g</div>
+                                </div>
+                                <div style="background: rgba(210,168,255,0.1); border: 1px solid rgba(210,168,255,0.25); border-radius: 12px; padding: 1rem; text-align: center;">
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.3rem;">🥗 Fiber</div>
+                                    <div id="pill-fiber" style="font-size: 1.4rem; font-weight: 800; color: #d2a8ff;">0g</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; text-align: center;">
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.3rem;">🔥 Calories</div>
+                                    <div id="pill-calories" style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                </div>
+                            </div>
+                            <div class="risk-assessment" id="risk-assessment">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="suggestions-box" id="daily-suggestions">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+             <!-- Food DB View (Mock PDF representation) -->
+            <section id="food-database" class="view">
+                <div class="card">
+                    <h2>Available Food Database (From PDFs)</h2>
+                    <p class="hint">This is a mock representation of the extracted PDF data.</p>
+                    <div class="table-container">
+                        <table id="food-table">
+                            <thead>
+                                <tr>
+                                    <th>Food Name</th>
+                                    <th>Category</th>
+                                    <th>Carbs (g)</th>
+                                    <th>Protein (g)</th>
+                                    <th>Fiber (g)</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="{{ url_for('static', filename='tracker_app.js') }}"></script>
+</body>
+</html>

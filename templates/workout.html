@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Daily Workout Plan – AI Health Digital Twin</title>
+    <meta name="description" content="Personalized daily workout routines to prevent diabetes, obesity, respiratory diseases and more.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='workout.css') }}">
+</head>
+<body>
+    <div class="bg-glow"></div>
+
+    <nav class="topnav">
+        <div class="nav-brand">
+            <span class="logo-icon">💪</span>
+            <span class="logo-text">FitTwin</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">🧬 Digital Twin</a>
+            <a href="/tracker" class="nav-link">🥗 Nutrition</a>
+            <a href="/workout" class="nav-link active">💪 Workout</a>
+        </div>
+        {% if user %}
+        <div class="nav-user">
+            <span class="user-pill">👤 {{ user.name }}</span>
+        </div>
+        {% endif %}
+    </nav>
+
+    <main class="container">
+
+        <!-- ═══ Personalized Health Banner (shown when conditions detected) ═══ -->
+        <div class="personal-banner hidden" id="personal-banner">
+            <div class="banner-icon">⚕️</div>
+            <div class="banner-text">
+                <strong id="banner-title">Personalized Workout Plan Ready</strong>
+                <span id="banner-conditions"></span>
+            </div>
+            <button class="banner-btn" id="banner-goto-btn">🎯 View My Plan</button>
+        </div>
+
+        <!-- ═══ AI Advice Card (Gemini-generated for unknown conditions) ═══ -->
+        <div class="ai-advice-card hidden" id="ai-advice-card">
+            <div class="ai-card-header">
+                <div>
+                    <span class="ai-badge">🤖 AI Generated Plan</span>
+                    <h3 id="ai-condition-label">Custom Condition Plan</h3>
+                </div>
+                <p style="font-size:0.85rem; color:var(--muted); margin-top:0.3rem;">
+                    Gemini AI personalized these exercises specifically for your condition.
+                </p>
+            </div>
+            <div class="ai-exercises-grid" id="ai-exercises-grid">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+
+        <!-- ═══ Hero Header ═══ -->
+        <section class="hero">
+            <div class="hero-text">
+                <h1>Your Daily <span class="gradient-text">Workout Plan</span></h1>
+                <p class="hero-sub">Science-backed routines to prevent diabetes, obesity, respiratory diseases &amp; more — personalized automatically from your health profile.</p>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-pill">
+                    <span class="stat-num" id="exercises-done">0</span>
+                    <span class="stat-label">Done</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-num" id="exercises-total">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-num" id="calories-burned">0</span>
+                    <span class="stat-label">kcal Burned</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ Progress Ring ═══ -->
+        <section class="progress-section">
+            <div class="progress-ring-wrap">
+                <svg viewBox="0 0 120 120" class="progress-ring-svg">
+                    <circle cx="60" cy="60" r="50" class="ring-bg"/>
+                    <circle cx="60" cy="60" r="50" class="ring-fill" id="ring-fill"/>
+                </svg>
+                <div class="ring-inner">
+                    <span class="ring-pct" id="ring-pct">0%</span>
+                    <span class="ring-label">Complete</span>
+                </div>
+            </div>
+            <div class="progress-info">
+                <h2>Today's Progress</h2>
+                <p id="progress-msg">Start your workout to track progress!</p>
+                <div class="goal-tags" id="goal-tags">
+                    <span class="goal-tag respiratory">🫁 Respiratory</span>
+                    <span class="goal-tag diabetes">🩸 Diabetes</span>
+                    <span class="goal-tag obesity">⚖️ Obesity</span>
+                    <span class="goal-tag fitness">🏃 Fitness</span>
+                </div>
+                <button class="btn-reset" id="reset-workout-btn">🔄 Reset Today</button>
+            </div>
+        </section>
+
+        <!-- ═══ 7-Day Calorie Chart ═══ -->
+        <section class="calorie-section">
+            <div class="calorie-section-header">
+                <div>
+                    <h2>🔥 Calorie Burn History</h2>
+                    <p class="calorie-subtitle">Calories burned from workouts over the last 7 days</p>
+                </div>
+                <div class="total-week-pill">
+                    <span class="week-cal-num" id="week-total-cal">0</span>
+                    <span class="week-cal-label">kcal this week</span>
+                </div>
+            </div>
+            <!-- SVG Bar Chart rendered by JS -->
+            <div class="chart-container" id="calorie-chart-container">
+                <div class="chart-placeholder">Loading your calorie history…</div>
+            </div>
+        </section>
+
+        <!-- ═══ Category Filter Tabs ═══ -->
+
+        <div class="tab-bar" id="tab-bar">
+            <button class="tab active" data-filter="all">🏅 All</button>
+            <button class="tab for-you-tab hidden" data-filter="personal" id="for-you-tab">🎯 For You</button>
+            <button class="tab" data-filter="fitness">🏃 Fitness</button>
+            <button class="tab" data-filter="respiratory">🫁 Respiratory</button>
+            <button class="tab" data-filter="diabetes">🩸 Diabetes</button>
+            <button class="tab" data-filter="obesity">⚖️ Obesity</button>
+            <button class="tab" data-filter="hypertension">🫀 Hypertension</button>
+            <button class="tab" data-filter="heart">❤️ Heart</button>
+            <button class="tab" data-filter="arthritis">🦴 Arthritis</button>
+            <button class="tab" data-filter="stress">🌿 Stress</button>
+            <button class="tab" data-filter="back">🦴 Back Pain</button>
+            <button class="tab" data-filter="pcos">🌸 PCOS</button>
+            <button class="tab" data-filter="thyroid">🦋 Thyroid</button>
+            <button class="tab" data-filter="cholesterol">💛 Cholesterol</button>
+        </div>
+
+        <!-- ═══ Workout Cards Grid ═══ -->
+        <section class="workout-grid" id="workout-grid">
+            <!-- Cards injected by JS -->
+        </section>
+
+        <!-- ═══ AI Guide Section ═══ -->
+        <section class="ai-guide-section">
+            <div class="ai-guide-header">
+                <div class="ai-guide-icon">🤖</div>
+                <div>
+                    <h2>Confused? Ask Your AI Coach</h2>
+                    <p>Tell FitTwin AI your condition, goal, or question — it'll create a personalized workout plan just for you.</p>
+                </div>
+            </div>
+
+            <div class="ai-guide-examples">
+                <span class="example-chip" data-msg="I have knee pain and can't do high-impact exercises">🦴 Knee Pain</span>
+                <span class="example-chip" data-msg="I am a beginner and don't know where to start">🌱 Complete Beginner</span>
+                <span class="example-chip" data-msg="I have liver disease and want safe exercises">🫀 Liver Disease</span>
+                <span class="example-chip" data-msg="I want to lose weight but I have a bad back">⚖️ Weight Loss with Back Pain</span>
+                <span class="example-chip" data-msg="I feel very stressed and anxious and need calming exercises">🌿 Stress & Anxiety</span>
+                <span class="example-chip" data-msg="I am 60 years old and want low-impact senior exercises">👴 Senior Fitness</span>
+            </div>
+
+            <div class="ai-guide-input-row">
+                <textarea id="ai-guide-input" class="ai-guide-textarea"
+                    placeholder="e.g. I have migraine headaches and want exercises that won't trigger them..." rows="2"></textarea>
+                <button class="btn-ask-ai" id="btn-ask-ai">
+                    <span id="ask-ai-label">✨ Ask AI</span>
+                </button>
+            </div>
+
+            <!-- AI Response Area -->
+            <div class="ai-guide-response hidden" id="ai-guide-response">
+                <div class="ai-reply-bubble" id="ai-reply-bubble"></div>
+                <div class="ai-plan-title" id="ai-plan-title"></div>
+                <div class="ai-guide-exercises" id="ai-guide-exercises"></div>
+                <div class="ai-guide-tip" id="ai-guide-tip"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Wellness Tips ═══ -->
+        <section class="tips-panel">
+            <h2>💡 Wellness Tips</h2>
+            <div class="tips-grid">
+                <div class="tip-card">
+                    <div class="tip-icon">🫁</div>
+                    <h3>Respiratory Health</h3>
+                    <p>Practice diaphragmatic breathing daily. It strengthens lungs, reduces breathlessness and improves oxygen circulation by up to 30%.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon">🩸</div>
+                    <h3>Diabetes Prevention</h3>
+                    <p>30-min brisk walks after meals lower blood glucose by up to 22%. Muscle activity absorbs glucose directly without insulin.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon">⚖️</div>
+                    <h3>Obesity Management</h3>
+                    <p>HIIT burns 25–30% more calories than steady cardio. Just 3 sessions/week yields measurable fat loss within 4 weeks.</p>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon">🫀</div>
+                    <h3>Heart & BP Health</h3>
+                    <p>Low-intensity cardio for 150 min/week reduces systolic blood pressure by 5–8 mmHg and strengthens the heart muscle significantly.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ═══ Exercise Timer Modal ═══ -->
+    <div class="timer-modal hidden" id="timer-modal">
+        <div class="timer-card">
+            <button class="close-timer" id="close-timer">✕</button>
+            <div class="timer-exercise-name" id="timer-exercise-name">Exercise</div>
+            <div class="timer-circle">
+                <svg viewBox="0 0 120 120" class="timer-svg">
+                    <circle cx="60" cy="60" r="50" class="timer-ring-bg"/>
+                    <circle cx="60" cy="60" r="50" class="timer-ring-fill" id="timer-ring"/>
+                </svg>
+                <div class="timer-countdown" id="timer-countdown">00:00</div>
+            </div>
+            <div class="timer-controls">
+                <button class="btn-timer" id="timer-start">▶ Start</button>
+                <button class="btn-timer secondary" id="timer-pause">⏸ Pause</button>
+            </div>
+            <button class="btn-done-timer" id="btn-done-timer">✅ Mark as Done</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='workout_app.js') }}"></script>
+</body>
+</html>
