@@ -159,6 +159,10 @@ def register():
         db.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', 
                    (name, email, generate_password_hash(password)))
         db.commit()
+        # Set session on registration
+        user = db.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
+        if user:
+            session['user_id'] = user['id']
         return jsonify({'message': 'Registration successful'}), 200
     except sqlite3.IntegrityError:
         return jsonify({'error': 'Email already exists'}), 400
@@ -214,10 +218,10 @@ def predict():
                    (session['user_id'], age, sleep, exercise, height, weight))
         db.commit()
 
-    # ── BMI ──────────────────────────────────────────────
+    # â”€â”€ BMI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bmi = weight / ((height / 100.0) ** 2) if height > 0 else 25
 
-    # ── Personalized nutrition targets (Harris-Benedict) ──
+    # â”€â”€ Personalized nutrition targets (Harris-Benedict) â”€â”€
     bmr  = 10 * weight + 6.25 * height - 5 * age + 5
     tdee = bmr * 1.375   # lightly active baseline
     target_protein  = weight * 0.8          # g
@@ -225,7 +229,7 @@ def predict():
     target_fiber    = 21 if age > 50 else 28 # g
     target_calories = tdee
 
-    # ── Fetch today's actual nutrition from DB ────────────
+    # â”€â”€ Fetch today's actual nutrition from DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     diet_score = 50  # neutral default if no data
     if 'user_id' in session:
         db = get_db()
@@ -254,7 +258,7 @@ def predict():
             except Exception:
                 pass
 
-    # ── Sleep quality calculation ─────────────────────────
+    # â”€â”€ Sleep quality calculation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Optimal = 7-9h. Penalty for under/over sleeping.
     def sleep_factor(s):
         if 7 <= s <= 9:   return 0        # ideal, no penalty
@@ -263,7 +267,7 @@ def predict():
 
     sleep_penalty = sleep_factor(sleep)    # always >= 0
 
-    # ── Exercise factor ──────────────────────────────────
+    # â”€â”€ Exercise factor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # exercise is in minutes/day: 0-120
     # More exercise = reduces all risks
     def exercise_benefit(mins):
@@ -274,7 +278,7 @@ def predict():
 
     exercise_bonus = exercise_benefit(exercise)
 
-    # ── Risk calculations (diet + sleep + exercise aware) ─
+    # â”€â”€ Risk calculations (diet + sleep + exercise aware) â”€
     bmi_penalty  = max(0, (bmi - 24) * 3)
     age_factor   = (age / 100) * 35
 
@@ -285,7 +289,7 @@ def predict():
     diabetes      = max(2, min(98, age_factor + bmi_penalty * 1.5 + sleep_penalty * 0.7 + 10 - diet_bonus * 1.2 - exercise_bonus * 0.4))
     obesity       = max(2, min(98, 5 + (bmi - 18) * 4 + sleep_penalty * 0.5 - diet_bonus * 0.8 - exercise_bonus * 0.6))
 
-    # ── Vitality score (real-world capped) ───────────────
+    # â”€â”€ Vitality score (real-world capped) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     risk_component  = heart_disease * 0.35 + diabetes * 0.30 + obesity * 0.25
     diet_component  = diet_score * 0.10
     sleep_component = max(0, 10 - sleep_penalty * 0.5)
@@ -302,7 +306,7 @@ def predict():
 
     health_score = max(8, min(age_ceiling - reality_friction, raw_score))
 
-    # ── BMI Category ─────────────────────────────────────
+    # â”€â”€ BMI Category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if bmi < 18.5:
         bmi_category = "Underweight"
     elif bmi < 25:
@@ -312,7 +316,7 @@ def predict():
     else:
         bmi_category = "Obese"
 
-    # ── Diet plan (kept for reference) ───────────────────
+    # â”€â”€ Diet plan (kept for reference) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     ai_diet = []
 
 
@@ -379,11 +383,11 @@ def save_snapshot():
     bmi_cat   = data.get('bmi_category', '')
 
     # Generate auto-remark
-    if vitality >= 85:   remark = '🌟 Excellent health day!'
-    elif vitality >= 72: remark = '✅ Good day overall.'
-    elif vitality >= 58: remark = '⚠️ Average — room to improve.'
-    elif vitality >= 42: remark = '😟 Below average day.'
-    else:                remark = '❌ Poor health indicators today.'
+    if vitality >= 85:   remark = 'ðŸŒŸ Excellent health day!'
+    elif vitality >= 72: remark = 'âœ… Good day overall.'
+    elif vitality >= 58: remark = 'âš ï¸ Average â€” room to improve.'
+    elif vitality >= 42: remark = 'ðŸ˜Ÿ Below average day.'
+    else:                remark = 'âŒ Poor health indicators today.'
 
     if diet_sc < 40:  remark += ' Low diet quality.'
     if sleep_h < 6:   remark += ' Insufficient sleep.'
@@ -448,7 +452,7 @@ def nutrition_api():
                     WHERE user_id = ?
                 ''', (json.dumps({}), json.dumps({}), today, session['user_id']))
                 db.commit()
-                return jsonify(None)  # Fresh day — no data
+                return jsonify(None)  # Fresh day â€” no data
             return jsonify({
                 'dailyTotal': json.loads(row['daily_total']),
                 'meals': json.loads(row['meals'])
@@ -501,7 +505,7 @@ def nutrition_analysis():
         start_date = str(today - timedelta(days=30))
         days = 30
     else:
-        # Daily — just return current nutrition_data
+        # Daily â€” just return current nutrition_data
         db = get_db()
         row = db.execute('SELECT daily_total FROM nutrition_data WHERE user_id = ?', (session['user_id'],)).fetchone()
         if row and row['daily_total']:
@@ -609,7 +613,7 @@ def workout_log():
         return jsonify({'status': 'saved', 'date': today,
                         'calories_burned': calories, 'exercises_done': ex_done})
 
-    # GET — return today's log + 7-day history
+    # GET â€” return today's log + 7-day history
     today_row = db.execute(
         'SELECT * FROM workout_logs WHERE user_id=? AND date=?', (uid, today)
     ).fetchone()
@@ -655,7 +659,7 @@ def workout_recommendations():
     raw = profile['medical_conditions'].strip()
     ctext = raw.lower().strip()
 
-    # ── Extended skip-word set (catches typos like 'nill', 'nulll', etc.) ──
+    # â”€â”€ Extended skip-word set (catches typos like 'nill', 'nulll', etc.) â”€â”€
     SKIP_WORDS = {
         'none', 'nil', 'nill', 'null', 'no', 'nah', 'na', 'n/a', 'n.a.',
         '-', '--', '---', 'nothing', 'no condition', 'no conditions',
@@ -665,7 +669,7 @@ def workout_recommendations():
     if ctext in SKIP_WORDS or len(ctext) <= 2:
         return jsonify({'conditions_text': raw, 'detected_tags': [], 'ai_advice': None})
 
-    # ── Keyword → internal tag mapping ─────────────────────────────────────
+    # â”€â”€ Keyword â†’ internal tag mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     CONDITION_MAP = [
         (['diabetes', 'prediabetes', 'diabetic', 'blood sugar', 'insulin resistance',
           'type 1', 'type 2', 't2dm', 't1dm'], 'diabetes'),
@@ -696,12 +700,12 @@ def workout_recommendations():
                     detected_tags.append(tag)
                 break
 
-    # ── If no known condition matched → call Gemini for a custom plan ──────
+    # â”€â”€ If no known condition matched â†’ call Gemini for a custom plan â”€â”€â”€â”€â”€â”€
     ai_advice = None
     if not detected_tags:
         if GEMINI_API_KEY:
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 prompt = f"""You are a certified fitness and wellness coach.
 
 A user's health profile says their medical condition is: "{raw}"
@@ -753,11 +757,11 @@ Return ONLY valid JSON (no markdown, no extra text, no code fences):
             ai_advice = {
                 "condition_label": raw,
                 "exercises": [
-                    {"name": "Brisk Walking", "emoji": "🚶", "duration": "30 minutes daily",
+                    {"name": "Brisk Walking", "emoji": "ðŸš¶", "duration": "30 minutes daily",
                      "benefit": "Low-impact aerobic activity that improves circulation and overall health for most conditions."},
-                    {"name": "Deep Breathing / Pranayama", "emoji": "🫁", "duration": "10 minutes daily",
+                    {"name": "Deep Breathing / Pranayama", "emoji": "ðŸ«", "duration": "10 minutes daily",
                      "benefit": "Reduces stress hormones, improves oxygen delivery, and calms the nervous system."},
-                    {"name": "Gentle Full-Body Stretching", "emoji": "🤸", "duration": "15 minutes daily",
+                    {"name": "Gentle Full-Body Stretching", "emoji": "ðŸ¤¸", "duration": "15 minutes daily",
                      "benefit": "Maintains flexibility, reduces stiffness, and supports joint and muscle health."},
                 ]
             }
@@ -784,8 +788,8 @@ def workout_ai_guide():
         return jsonify({'error': 'AI unavailable'}), 503
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        prompt = f"""You are FitTwin AI — a friendly certified fitness coach inside a health app.
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = f"""You are FitTwin AI â€” a friendly certified fitness coach inside a health app.
 
 A user wrote: "{user_msg}"
 
@@ -823,11 +827,11 @@ Include 3-5 exercises. Keep language simple and supportive."""
             'reply': "I'm here to help! Based on your message, here's a safe starter plan you can try today.",
             'plan_title': 'Safe Starter Workout Plan',
             'exercises': [
-                {'name': 'Brisk Walking', 'emoji': '🚶', 'duration': '30 min daily', 'benefit': 'Improves cardio health and mood.'},
-                {'name': 'Bodyweight Squats', 'emoji': '🦵', 'duration': '3 sets × 15', 'benefit': 'Strengthens legs and improves metabolism.'},
-                {'name': 'Deep Breathing', 'emoji': '🫁', 'duration': '10 min daily', 'benefit': 'Reduces stress and improves oxygen flow.'},
+                {'name': 'Brisk Walking', 'emoji': 'ðŸš¶', 'duration': '30 min daily', 'benefit': 'Improves cardio health and mood.'},
+                {'name': 'Bodyweight Squats', 'emoji': 'ðŸ¦µ', 'duration': '3 sets Ã— 15', 'benefit': 'Strengthens legs and improves metabolism.'},
+                {'name': 'Deep Breathing', 'emoji': 'ðŸ«', 'duration': '10 min daily', 'benefit': 'Reduces stress and improves oxygen flow.'},
             ],
-            'tip': 'Start slow and be consistent — even 15 minutes a day makes a big difference! 💪'
+            'tip': 'Start slow and be consistent â€” even 15 minutes a day makes a big difference! ðŸ’ª'
         }), 200
 
 
@@ -890,11 +894,11 @@ def coach_chat():
     # Check if API key is configured
     if not GEMINI_API_KEY:
         return jsonify({
-            'reply': "⚠️ The Gemini API Key is missing! Please provide your API key to the AI assistant to activate my true intelligence."
+            'reply': "âš ï¸ The Gemini API Key is missing! Please provide your API key to the AI assistant to activate my true intelligence."
         })
         
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         You are 'NutriSmart AI', an elite certified nutritionist, doctor, and health coach.
@@ -935,7 +939,7 @@ def detect_food():
         return jsonify({'error': 'No selected file'}), 400
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = """
         You are an expert AI food analyzer. Analyze this image of food.
         Identify the primary dish/item. Estimate its nutritional values per standard serving.
@@ -999,4 +1003,4 @@ if __name__ == '__main__':
     init_db()
     print("Starting AI Health Digital Twin Server...", flush=True)
     print("Access the interface locally at: http://127.0.0.1:5001", flush=True)
-    app.run(host='0.0.0.0', debug=False, port=5001)
+    app.run(host='0.0.0.0', debug=True, port=5001)
